@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { message, Spin, Modal, Input, InputNumber, Tooltip, Popconfirm } from 'antd';
-import { DeleteOutlined, PlusOutlined, ShoppingCartOutlined, UserOutlined, PhoneOutlined, MailOutlined, EditOutlined, WhatsAppOutlined } from '@ant-design/icons';
+import { DeleteOutlined, PlusOutlined, ShoppingCartOutlined, UserOutlined, PhoneOutlined, MailOutlined, EditOutlined } from '@ant-design/icons';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const CAT = { Electronics:{bg:'rgba(77,150,255,.12)',color:'#4d96ff'}, Accessories:{bg:'rgba(108,99,255,.12)',color:'#6c63ff'}, Audio:{bg:'rgba(82,201,122,.12)',color:'#52c97a'}, General:{bg:'rgba(245,158,11,.12)',color:'#f59e0b'} };
@@ -10,19 +10,11 @@ const CAT = { Electronics:{bg:'rgba(77,150,255,.12)',color:'#4d96ff'}, Accessori
 function F({label,err,children}){return(<div><label className='field-label' style={{color:err?'#ef4444':undefined}}>{label}{err&&<span style={{color:'#ef4444',fontSize:11,fontWeight:500,marginLeft:8}}>{err}</span>}</label>{children}</div>);}
 
 // ── Validation ──────────────────────────────────────────────
-// Phone: exactly 10 digits (after stripping spaces/dashes/+91 prefix)
 const validatePhone = v => {
-  if (!v || !v.trim()) return true; // optional
-  const digits = v.replace(/[\s\-()]/g, '').replace(/^\+91/, '').replace(/^0/, '');
-  return /^\d{10}$/.test(digits);
-};
-// WhatsApp: same as phone — exactly 10 digits
-const validateWhatsApp = v => {
   if (!v || !v.trim()) return true;
   const digits = v.replace(/[\s\-()]/g, '').replace(/^\+91/, '').replace(/^0/, '');
   return /^\d{10}$/.test(digits);
 };
-// Email: must contain @
 const validateEmail = v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 
 // ── ProductCard ──────────────────────────────────────────────
@@ -57,7 +49,6 @@ function BillingModule() {
   const [customerName,setCustomerName]=useState('');
   const [customerPhone,setCustomerPhone]=useState('');
   const [customerEmail,setCustomerEmail]=useState('');
-  const [whatsapp,setWhatsapp]=useState('');
   const [taxAmount,setTaxAmount]=useState(0);
   const [discountAmount,setDiscountAmount]=useState(0);
   const [paymentMethod,setPaymentMethod]=useState('Cash');
@@ -70,7 +61,6 @@ function BillingModule() {
   const [showEdit,setShowEdit]=useState(false);
   const [editProd,setEditProd]=useState(null);
   const [editErrors,setEditErrors]=useState({});
-  const [sendingWA,setSendingWA]=useState(false);
 
   useEffect(()=>{fetchProducts();},[]);
 
@@ -92,18 +82,60 @@ function BillingModule() {
     else if(!/^[a-zA-Z\s.'-]{2,}$/.test(customerName.trim())) e.customerName='Name must contain only letters (no numbers)';
     if(customerPhone.trim() && !validatePhone(customerPhone)) e.customerPhone='Enter a valid 10-digit phone number';
     if(customerEmail.trim() && !validateEmail(customerEmail)) e.customerEmail='Email must contain @ (e.g. name@email.com)';
-    if(whatsapp.trim() && !validateWhatsApp(whatsapp)) e.whatsapp='Enter a valid 10-digit WhatsApp number';
     setErrors(e);
     return Object.keys(e).length===0;
   };
 
-  // Create bill + WhatsApp PDF send
-  const handleCreateBill=async()=>{if(!validateForm())return;if(cartItems.length===0){message.error('Add items to the bill');return;}setSubmitting(true);try{const token=localStorage.getItem('token');const res=await axios.post(API_URL+'/invoices',{customer_name:customerName,customer_phone:customerPhone,customer_email:customerEmail,items:cartItems,tax_amount:taxAmount,discount_amount:discountAmount,payment_method:paymentMethod},{headers:{Authorization:'Bearer '+token}});message.success('Bill created!');setTimeout(()=>downloadPDF(res.data.id,res.data.invoice_number),500);if(whatsapp.trim()){setTimeout(()=>sendWhatsAppPDF(res.data.id,res.data.invoice_number,whatsapp.trim()),1500);}setCustomerName('');setCustomerPhone('');setCustomerEmail('');setWhatsapp('');setCartItems([]);setTaxAmount(0);setDiscountAmount(0);setPaymentMethod('Cash');setErrors({});}catch(err){message.error(err.response?.data?.error||'Failed to create bill');}finally{setSubmitting(false);}};
+  // Create bill and download PDF
+  const handleCreateBill=async()=>{
+    if(!validateForm())return;
+    if(cartItems.length===0){message.error('Add items to the bill');return;}
+    setSubmitting(true);
+    try{
+      const token=localStorage.getItem('token');
+      const res=await axios.post(API_URL+'/invoices',{
+        customer_name:customerName,
+        customer_phone:customerPhone,
+        customer_email:customerEmail,
+        items:cartItems,
+        tax_amount:taxAmount,
+        discount_amount:discountAmount,
+        payment_method:paymentMethod
+      },{headers:{Authorization:'Bearer '+token}});
+      message.success('Bill created! Downloading PDF...');
+      setTimeout(()=>downloadPDF(res.data.id,res.data.invoice_number),500);
+      setCustomerName('');
+      setCustomerPhone('');
+      setCustomerEmail('');
+      setCartItems([]);
+      setTaxAmount(0);
+      setDiscountAmount(0);
+      setPaymentMethod('Cash');
+      setErrors({});
+    }catch(err){
+      message.error(err.response?.data?.error||'Failed to create bill');
+    }finally{
+      setSubmitting(false);
+    }
+  };
 
-  const downloadPDF=async(invoiceId,invoiceNumber)=>{try{const token=localStorage.getItem('token');const res=await fetch(API_URL+'/invoices/'+invoiceId+'/pdf',{headers:{Authorization:'Bearer '+token}});const blob=await res.blob();const url=window.URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='invoice-'+(invoiceNumber||invoiceId)+'.pdf';document.body.appendChild(a);a.click();window.URL.revokeObjectURL(url);document.body.removeChild(a);}catch{message.error('Failed to download PDF');}};
-
-  // WhatsApp: fetch PDF as base64, create blob URL, open WhatsApp with file
-  const sendWhatsAppPDF=async(invoiceId,invoiceNumber,phone)=>{setSendingWA(true);try{const token=localStorage.getItem('token');const res=await axios.get(API_URL+'/invoices/'+invoiceId+'/pdf-base64',{headers:{Authorization:'Bearer '+token}});const {base64,filename}=res.data;const byteChars=atob(base64);const byteArr=new Uint8Array(byteChars.length);for(let i=0;i<byteChars.length;i++)byteArr[i]=byteChars.charCodeAt(i);const blob=new Blob([byteArr],{type:'application/pdf'});const blobUrl=window.URL.createObjectURL(blob);let cleaned=phone.replace(/[\s\-()]/g,'');if(!cleaned.startsWith('+'))cleaned=cleaned.startsWith('0')?'+91'+cleaned.slice(1):'+91'+cleaned;cleaned=cleaned.replace('+','');const msg=encodeURIComponent('Hello! Your invoice *'+invoiceNumber+'* from *Look @ me* is ready.\n\nPlease find your PDF invoice attached.\n\nThank you for your business!');const waUrl='https://wa.me/'+cleaned+'?text='+msg;window.open(waUrl,'_blank');const a=document.createElement('a');a.href=blobUrl;a.download=filename;document.body.appendChild(a);a.click();window.URL.revokeObjectURL(blobUrl);document.body.removeChild(a);message.success({content:'PDF downloaded to your device! WhatsApp is opening - please attach the PDF file in the chat.',duration:6});}catch{message.error('Failed to prepare WhatsApp send');}finally{setSendingWA(false);}};
+  const downloadPDF=async(invoiceId,invoiceNumber)=>{
+    try{
+      const token=localStorage.getItem('token');
+      const res=await fetch(API_URL+'/invoices/'+invoiceId+'/pdf',{headers:{Authorization:'Bearer '+token}});
+      const blob=await res.blob();
+      const url=window.URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download='invoice-'+(invoiceNumber||invoiceId)+'.pdf';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }catch{
+      message.error('Failed to download PDF');
+    }
+  };
 
   // Product CRUD
   const validateProd=(d,setE)=>{const e={};if(!d.name||d.name.trim().length<2)e.name='Product name must be at least 2 characters';if(!d.price||d.price<=0)e.price='Price must be greater than 0';if(!d.category||d.category.trim().length<2)e.category='Category is required';setE(e);return Object.keys(e).length===0;};
@@ -115,8 +147,6 @@ function BillingModule() {
 
   if(loading)return(<div style={{display:'flex',justifyContent:'center',alignItems:'center',height:400}}><Spin size='large'/></div>);
 
-  // F is defined outside this component to prevent focus loss
-
   return (
     <div style={{maxWidth:1400,margin:'0 auto',width:'100%',minWidth:0}}>
       <div className='billing-grid'>
@@ -127,7 +157,6 @@ function BillingModule() {
               <F label='Customer Name *' err={errors.customerName}><div className='field-wrap'><span className='field-icon'><UserOutlined/></span><input type='text' value={customerName} onChange={e=>{const v=e.target.value.replace(/[0-9]/g,'');setCustomerName(v);if(errors.customerName)setErrors({...errors,customerName:''});}} placeholder='Full name (letters only)' className='field-input' style={{borderColor:errors.customerName?'#ef4444':undefined}}/></div></F>
               <F label='Phone Number (10 digits)' err={errors.customerPhone}><div className='field-wrap'><span className='field-icon'><PhoneOutlined/></span><input type='tel' value={customerPhone} onChange={e=>{const v=e.target.value.replace(/[^\d\s\-+()\+]/g,'');setCustomerPhone(v);if(errors.customerPhone)setErrors({...errors,customerPhone:''});}} placeholder='98765 43210' className='field-input' style={{borderColor:errors.customerPhone?'#ef4444':undefined}} maxLength={15}/></div></F>
               <F label='Email Address' err={errors.customerEmail}><div className='field-wrap'><span className='field-icon'><MailOutlined/></span><input type='email' value={customerEmail} onChange={e=>{setCustomerEmail(e.target.value);if(errors.customerEmail)setErrors({...errors,customerEmail:''});}} placeholder='name@email.com' className='field-input' style={{borderColor:errors.customerEmail?'#ef4444':undefined}}/></div></F>
-              <F label={<span style={{display:'flex',alignItems:'center',gap:6}}><WhatsAppOutlined style={{color:'#25D366'}}/> WhatsApp (10 digits) <span style={{fontSize:11,color:'var(--muted)',fontWeight:400}}>(optional)</span></span>} err={errors.whatsapp}><div className='field-wrap'><span className='field-icon' style={{color:'#25D366'}}><WhatsAppOutlined/></span><input type='tel' value={whatsapp} onChange={e=>{const v=e.target.value.replace(/[^\d\s\-+()\+]/g,'');setWhatsapp(v);if(errors.whatsapp)setErrors({...errors,whatsapp:''});}} placeholder='98765 43210' className='field-input' style={{borderColor:errors.whatsapp?'#ef4444':whatsapp?'#25D366':undefined}} maxLength={15} onFocus={e=>{e.target.style.borderColor='#25D366';e.target.style.boxShadow='0 0 0 4px rgba(37,211,102,.1)';}} onBlur={e=>{e.target.style.borderColor=errors.whatsapp?'#ef4444':whatsapp?'#25D366':'var(--border)';e.target.style.boxShadow='none';}}/></div>{whatsapp&&!errors.whatsapp&&<p style={{fontSize:11,color:'#25D366',marginTop:5,fontWeight:600}}>PDF will be downloaded and WhatsApp will open to send it</p>}</F>
             </div></div>
           </div>
           <div className='card'>
@@ -156,14 +185,13 @@ function BillingModule() {
             <div className='cart-items-list'>{cartItems.map(item=>(<div key={item.product_id} className='cart-item'><div className='cart-item-info'><div className='cart-item-name'>{item.product_name}</div><div className='cart-item-unit'>Rs.{item.unit_price.toLocaleString('en-IN')} each</div></div><div style={{display:'flex',alignItems:'center',gap:6}}><button onClick={()=>updateQty(item.product_id,item.quantity-1)} style={{width:24,height:24,borderRadius:6,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',fontWeight:700,color:'var(--primary)',fontSize:14}}>-</button><span style={{fontSize:13,fontWeight:700,minWidth:22,textAlign:'center'}}>{item.quantity}</span><button onClick={()=>updateQty(item.product_id,item.quantity+1)} style={{width:24,height:24,borderRadius:6,border:'1px solid var(--border)',background:'#fff',cursor:'pointer',fontWeight:700,color:'var(--primary)',fontSize:14}}>+</button></div><div className='cart-item-total'>Rs.{item.total_price.toLocaleString('en-IN')}</div><button className='cart-del-btn' onClick={()=>removeFromCart(item.product_id)}><DeleteOutlined/></button></div>))}</div>
             <div className='cart-summary'>
               <div className='summary-row'><span>Subtotal</span><span style={{fontWeight:700,color:'var(--text)'}}>Rs.{subtotal.toLocaleString('en-IN')}</span></div>
-              <div className='summary-row'><span>Tax (Rs.)</span><input type='number' min='0' value={taxAmount} onChange={e=>setTaxAmount(parseFloat(e.target.value)||0)} className='summary-input' onFocus={e=>e.target.style.borderColor='var(--primary)'} onBlur={e=>e.target.style.borderColor='var(--border)'}/></div>
-              <div className='summary-row'><span>Discount (Rs.)</span><input type='number' min='0' value={discountAmount} onChange={e=>setDiscountAmount(parseFloat(e.target.value)||0)} className='summary-input' onFocus={e=>e.target.style.borderColor='var(--primary)'} onBlur={e=>e.target.style.borderColor='var(--border)'}/></div>
+              <div className='summary-row'><span>Tax (Rs.)</span><input type='number' min='0' value={taxAmount} onChange={e=>setTaxAmount(parseFloat(e.target.value)||0)} className='summary-input' onFocus={e=>e.target.style.borderColor='var(--primary)'} onBlur={e=>{e.target.style.borderColor='var(--border)';}}/></div>
+              <div className='summary-row'><span>Discount (Rs.)</span><input type='number' min='0' value={discountAmount} onChange={e=>setDiscountAmount(parseFloat(e.target.value)||0)} className='summary-input' onFocus={e=>e.target.style.borderColor='var(--primary)'} onBlur={e=>{e.target.style.borderColor='var(--border)';}}/></div>
             </div>
             <div className='cart-total'><span className='cart-total-label'>Total Amount</span><span className='cart-total-value'>Rs.{total.toLocaleString('en-IN')}</span></div>
-            {whatsapp&&!errors.whatsapp&&(<div style={{background:'rgba(37,211,102,.08)',border:'1.5px solid rgba(37,211,102,.3)',borderRadius:10,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8}}><WhatsAppOutlined style={{color:'#25D366',fontSize:16}}/><span style={{fontSize:12,color:'#25D366',fontWeight:700}}>PDF will be sent to {whatsapp}</span></div>)}
             <p style={{fontSize:12,fontWeight:700,color:'var(--muted)',marginBottom:10,textTransform:'uppercase',letterSpacing:'.5px'}}>Payment Method</p>
             <div className='payment-grid'>{payMethods.map(pm=>(<button key={pm.key} className='pay-btn' onClick={()=>setPaymentMethod(pm.key)} style={{border:paymentMethod===pm.key?'2px solid '+pm.color:'2px solid var(--border)',background:paymentMethod===pm.key?pm.color+'15':'#fff',color:paymentMethod===pm.key?pm.color:'var(--muted)'}}>{pm.icon} {pm.key}</button>))}</div>
-            <button className='create-btn' onClick={handleCreateBill} disabled={submitting||sendingWA}>{submitting?'Creating...':(sendingWA?'Sending to WhatsApp...':(whatsapp?'Create, Download & Send on WhatsApp':'Create & Download Bill'))}</button>
+            <button className='create-btn' onClick={handleCreateBill} disabled={submitting}>{submitting?'Creating...':'Create & Download Bill'}</button>
             <button className='clear-btn' onClick={()=>setCartItems([])}>Clear Cart</button>
           </>)}
         </div>
@@ -174,7 +202,7 @@ function BillingModule() {
   );
 }
 
-/* ── Field error wrapper for modals (outside component to prevent focus loss) ── */
+/* ── Field error wrapper for modals ── */
 function E({label,err,children}){
   return(
     <div style={{marginBottom:4}}>
