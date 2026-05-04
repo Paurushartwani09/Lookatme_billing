@@ -2,10 +2,14 @@
   "name": "billing-system",
   "private": true,
   "version": "0.0.0",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "vite",
     "server": "node server.js",
     "build": "vite build",
+    "build:server": "npm install --build-from-source sqlite3",
     "lint": "eslint .",
     "preview": "vite preview"
   },
