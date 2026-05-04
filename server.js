@@ -466,11 +466,11 @@ app.get('/api/invoices/:id/pdf', authenticateToken, (req, res) => {
       doc.fillColor('#6b7280').font('Helvetica').fontSize(9);
       let billY = infoY + 50;
       if (invoice.customer_phone) {
-        doc.text(`📞  ${invoice.customer_phone}`, margin + 16, billY, { lineBreak: false });
+        doc.text(`Ph: ${invoice.customer_phone}`, margin + 16, billY, { lineBreak: false });
         billY += 14;
       }
       if (invoice.customer_email) {
-        doc.text(`✉   ${invoice.customer_email}`, margin + 16, billY, { lineBreak: false });
+        doc.text(`Email: ${invoice.customer_email}`, margin + 16, billY, { lineBreak: false });
         billY += 14;
       }
 
@@ -562,9 +562,9 @@ app.get('/api/invoices/:id/pdf', authenticateToken, (req, res) => {
       rowY += 60;
 
       // ── PAYMENT METHOD BADGE ──────────────────────────────────────
-      doc.roundedRect(margin, rowY - 10, 120, 26, 6).fill('rgba(107,207,127,0.15)');
+      doc.roundedRect(margin, rowY - 10, 140, 26, 6).fill('rgba(107,207,127,0.15)');
       doc.fillColor('#6bcf7f').font('Helvetica-Bold').fontSize(9)
-         .text(`✓  Paid via ${invoice.payment_method}`, margin + 10, rowY - 3, { lineBreak: false });
+         .text(`Paid via ${invoice.payment_method}`, margin + 10, rowY - 3, { lineBreak: false });
 
       // ── FOOTER ────────────────────────────────────────────────────
       const footerY = 780;
@@ -695,7 +695,7 @@ app.get('/api/invoices/:id/pdf-base64', authenticateToken, (req, res) => {
       doc.fillColor('#1a1a2e').font('Helvetica-Bold').fontSize(13).text(invoice.customer_name,margin+16,infoY+32,{width:210,lineBreak:false});
       doc.fillColor('#6b7280').font('Helvetica').fontSize(9);
       let billY=infoY+50;
-      if(invoice.customer_phone){doc.text(`Phone: ${invoice.customer_phone}`,margin+16,billY,{lineBreak:false});billY+=14;}
+      if(invoice.customer_phone){doc.text(`Ph: ${invoice.customer_phone}`,margin+16,billY,{lineBreak:false});billY+=14;}
       if(invoice.customer_email){doc.text(`Email: ${invoice.customer_email}`,margin+16,billY,{lineBreak:false});billY+=14;}
       const detailX=W-margin-240;
       doc.roundedRect(detailX,infoY,240,110,10).fill('#f8f9fc');
