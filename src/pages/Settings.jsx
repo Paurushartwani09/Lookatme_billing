@@ -5,13 +5,26 @@ import { UserOutlined, LockOutlined, EyeOutlined, EyeInvisibleOutlined, SettingO
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-function PasswordInput({ value, onChange, placeholder, id }) {
+// ── Defined OUTSIDE Settings to prevent focus loss on re-render ──────────────
+
+function F({ label, err, children }) {
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <label className='field-label' style={{ color: err ? '#ef4444' : undefined }}>
+        {label}
+        {err && <span style={{ color: '#ef4444', fontSize: 11, fontWeight: 500, marginLeft: 8 }}>{err}</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function PasswordInput({ value, onChange, placeholder }) {
   const [show, setShow] = useState(false);
   return (
     <div className='field-wrap'>
       <span className='field-icon'><LockOutlined /></span>
       <input
-        id={id}
         type={show ? 'text' : 'password'}
         value={value}
         onChange={onChange}
@@ -31,21 +44,23 @@ function PasswordInput({ value, onChange, placeholder, id }) {
   );
 }
 
-function Settings({ user, onUserUpdate }) {
-  // ── Username change ──────────────────────────────────────
-  const [newUsername, setNewUsername]   = useState('');
-  const [currentPwdU, setCurrentPwdU]  = useState('');
-  const [usernameErr, setUsernameErr]   = useState({});
-  const [savingUser,  setSavingUser]    = useState(false);
-  const [userDone,    setUserDone]      = useState(false);
+// ─────────────────────────────────────────────────────────────────────────────
 
-  // ── Password change ──────────────────────────────────────
-  const [currentPwd,  setCurrentPwd]   = useState('');
-  const [newPwd,      setNewPwd]       = useState('');
-  const [confirmPwd,  setConfirmPwd]   = useState('');
-  const [pwdErr,      setPwdErr]       = useState({});
-  const [savingPwd,   setSavingPwd]    = useState(false);
-  const [pwdDone,     setPwdDone]      = useState(false);
+function Settings({ user, onUserUpdate }) {
+  // ── Username change state ────────────────────────────────
+  const [newUsername, setNewUsername] = useState('');
+  const [currentPwdU, setCurrentPwdU] = useState('');
+  const [usernameErr, setUsernameErr] = useState({});
+  const [savingUser,  setSavingUser]  = useState(false);
+  const [userDone,    setUserDone]    = useState(false);
+
+  // ── Password change state ────────────────────────────────
+  const [currentPwd, setCurrentPwd] = useState('');
+  const [newPwd,     setNewPwd]     = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [pwdErr,     setPwdErr]     = useState({});
+  const [savingPwd,  setSavingPwd]  = useState(false);
+  const [pwdDone,    setPwdDone]    = useState(false);
 
   // ── Validate username form ───────────────────────────────
   const validateUsername = () => {
@@ -81,7 +96,6 @@ function Settings({ user, onUserUpdate }) {
         current_password: currentPwdU,
       }, { headers: { Authorization: `Bearer ${token}` } });
 
-      // Update stored user info and re-login with new token
       const updatedUser = { ...user, username: newUsername.trim() };
       localStorage.setItem('user', JSON.stringify(updatedUser));
       localStorage.setItem('token', res.data.token);
@@ -137,15 +151,17 @@ function Settings({ user, onUserUpdate }) {
     }
   };
 
-  const F = ({ label, err, children }) => (
-    <div style={{ marginBottom: 18 }}>
-      <label className='field-label' style={{ color: err ? '#ef4444' : undefined }}>
-        {label}
-        {err && <span style={{ color: '#ef4444', fontSize: 11, fontWeight: 500, marginLeft: 8 }}>{err}</span>}
-      </label>
-      {children}
-    </div>
-  );
+  // ── Password strength ────────────────────────────────────
+  const getStrength = (pwd) => {
+    if (!pwd) return 0;
+    if (pwd.length >= 12 && /[A-Z]/.test(pwd) && /\d/.test(pwd) && /[^a-zA-Z0-9]/.test(pwd)) return 4;
+    if (pwd.length >= 8 && (/[A-Z]/.test(pwd) || /\d/.test(pwd))) return 3;
+    if (pwd.length >= 6) return 2;
+    return 1;
+  };
+  const strengthColors = ['#ef4444', '#f59e0b', '#4d96ff', '#52c97a'];
+  const strengthLabels = ['Too short', 'Weak', 'Good', 'Strong'];
+  const strength = getStrength(newPwd);
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', width: '100%' }}>
@@ -183,7 +199,7 @@ function Settings({ user, onUserUpdate }) {
                 <input
                   type='text'
                   value={newUsername}
-                  onChange={e => { setNewUsername(e.target.value); if (usernameErr.newUsername) setUsernameErr({ ...usernameErr, newUsername: '' }); }}
+                  onChange={e => { setNewUsername(e.target.value); if (usernameErr.newUsername) setUsernameErr(prev => ({ ...prev, newUsername: '' })); }}
                   placeholder='Enter new username'
                   className='field-input'
                   style={{ borderColor: usernameErr.newUsername ? '#ef4444' : undefined }}
@@ -194,7 +210,7 @@ function Settings({ user, onUserUpdate }) {
             <F label='Current Password (to confirm)' err={usernameErr.currentPwdU}>
               <PasswordInput
                 value={currentPwdU}
-                onChange={e => { setCurrentPwdU(e.target.value); if (usernameErr.currentPwdU) setUsernameErr({ ...usernameErr, currentPwdU: '' }); }}
+                onChange={e => { setCurrentPwdU(e.target.value); if (usernameErr.currentPwdU) setUsernameErr(prev => ({ ...prev, currentPwdU: '' })); }}
                 placeholder='Enter current password'
               />
             </F>
@@ -206,8 +222,7 @@ function Settings({ user, onUserUpdate }) {
                 background: userDone ? 'linear-gradient(135deg,#56ab2f,#a8e063)' : 'linear-gradient(135deg,#4d96ff,#1e90ff)',
                 color: '#fff', fontWeight: 700, fontSize: 14, cursor: savingUser ? 'not-allowed' : 'pointer',
                 fontFamily: 'Raleway, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: savingUser ? 0.7 : 1, transition: 'all .3s',
-                boxShadow: '0 4px 14px rgba(77,150,255,.35)',
+                opacity: savingUser ? 0.7 : 1, transition: 'all .3s', boxShadow: '0 4px 14px rgba(77,150,255,.35)',
               }}
             >
               {savingUser ? <Spin size='small' /> : userDone ? <><CheckCircleOutlined /> Username Updated!</> : 'Update Username'}
@@ -232,39 +247,35 @@ function Settings({ user, onUserUpdate }) {
             <F label='Current Password' err={pwdErr.currentPwd}>
               <PasswordInput
                 value={currentPwd}
-                onChange={e => { setCurrentPwd(e.target.value); if (pwdErr.currentPwd) setPwdErr({ ...pwdErr, currentPwd: '' }); }}
+                onChange={e => { setCurrentPwd(e.target.value); if (pwdErr.currentPwd) setPwdErr(prev => ({ ...prev, currentPwd: '' })); }}
                 placeholder='Enter current password'
               />
             </F>
             <F label='New Password (min 6 characters)' err={pwdErr.newPwd}>
               <PasswordInput
                 value={newPwd}
-                onChange={e => { setNewPwd(e.target.value); if (pwdErr.newPwd) setPwdErr({ ...pwdErr, newPwd: '' }); }}
+                onChange={e => { setNewPwd(e.target.value); if (pwdErr.newPwd) setPwdErr(prev => ({ ...prev, newPwd: '' })); }}
                 placeholder='Enter new password'
               />
             </F>
             <F label='Confirm New Password' err={pwdErr.confirmPwd}>
               <PasswordInput
                 value={confirmPwd}
-                onChange={e => { setConfirmPwd(e.target.value); if (pwdErr.confirmPwd) setPwdErr({ ...pwdErr, confirmPwd: '' }); }}
+                onChange={e => { setConfirmPwd(e.target.value); if (pwdErr.confirmPwd) setPwdErr(prev => ({ ...prev, confirmPwd: '' })); }}
                 placeholder='Re-enter new password'
               />
             </F>
 
             {/* Password strength indicator */}
-            {newPwd && (
+            {newPwd.length > 0 && (
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-                  {[1,2,3,4].map(i => {
-                    const strength = newPwd.length >= 12 && /[A-Z]/.test(newPwd) && /\d/.test(newPwd) && /[^a-zA-Z0-9]/.test(newPwd) ? 4
-                      : newPwd.length >= 8 && (/[A-Z]/.test(newPwd) || /\d/.test(newPwd)) ? 3
-                      : newPwd.length >= 6 ? 2 : 1;
-                    const colors = ['#ef4444','#f59e0b','#4d96ff','#52c97a'];
-                    return <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= strength ? colors[strength-1] : 'var(--border)', transition: 'all .3s' }} />;
-                  })}
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= strength ? strengthColors[strength - 1] : 'var(--border)', transition: 'all .3s' }} />
+                  ))}
                 </div>
-                <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                  {newPwd.length < 6 ? 'Too short' : newPwd.length >= 12 && /[A-Z]/.test(newPwd) && /\d/.test(newPwd) ? 'Strong' : newPwd.length >= 8 ? 'Good' : 'Weak'}
+                <span style={{ fontSize: 11, color: strength > 0 ? strengthColors[strength - 1] : 'var(--muted)', fontWeight: 600 }}>
+                  {strengthLabels[strength > 0 ? strength - 1 : 0]}
                 </span>
               </div>
             )}
@@ -277,8 +288,7 @@ function Settings({ user, onUserUpdate }) {
                 background: pwdDone ? 'linear-gradient(135deg,#56ab2f,#a8e063)' : 'linear-gradient(135deg,#f59e0b,#ef4444)',
                 color: '#fff', fontWeight: 700, fontSize: 14, cursor: savingPwd ? 'not-allowed' : 'pointer',
                 fontFamily: 'Raleway, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: savingPwd ? 0.7 : 1, transition: 'all .3s',
-                boxShadow: '0 4px 14px rgba(245,158,11,.35)',
+                opacity: savingPwd ? 0.7 : 1, transition: 'all .3s', boxShadow: '0 4px 14px rgba(245,158,11,.35)',
               }}
             >
               {savingPwd ? <Spin size='small' /> : pwdDone ? <><CheckCircleOutlined /> Password Updated!</> : 'Update Password'}
