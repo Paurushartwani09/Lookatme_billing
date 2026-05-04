@@ -338,7 +338,12 @@ app.get('/api/invoices', authenticateToken, (req, res) => {
     `SELECT * FROM invoices ORDER BY created_at DESC`,
     (err, invoices) => {
       if (err) return res.status(500).json({ error: 'Database error' });
-      res.json(invoices);
+      // Append Z so JS parses as UTC, not local time
+      const result = invoices.map(inv => ({
+        ...inv,
+        created_at: inv.created_at.endsWith('Z') ? inv.created_at : inv.created_at + 'Z'
+      }));
+      res.json(result);
     }
   );
 });
@@ -350,6 +355,11 @@ app.get('/api/invoices/:id', authenticateToken, (req, res) => {
   db.get(`SELECT * FROM invoices WHERE id = ?`, [id], (err, invoice) => {
     if (err) return res.status(500).json({ error: 'Database error' });
     if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+
+    // Append Z so JS parses as UTC
+    if (invoice.created_at && !invoice.created_at.endsWith('Z')) {
+      invoice.created_at = invoice.created_at + 'Z';
+    }
 
     db.all(`SELECT * FROM invoice_items WHERE invoice_id = ?`, [id], (err, items) => {
       if (err) return res.status(500).json({ error: 'Database error' });

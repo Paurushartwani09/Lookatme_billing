@@ -154,8 +154,8 @@ function Records() {
       title: 'Date', dataIndex: 'created_at', key: 'created_at',
       render: d => (
         <div style={{ fontFamily: 'Raleway, sans-serif' }}>
-          <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 13 }}>{new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
+          <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: 13 }}>{new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })}</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)' }}>{new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}</div>
         </div>
       ),
       sorter: (a, b) => new Date(b.created_at) - new Date(a.created_at),
@@ -267,7 +267,7 @@ function Records() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 {[
                   { label: 'Invoice Number', value: selectedInvoice.invoice_number },
-                  { label: 'Date', value: new Date(selectedInvoice.created_at).toLocaleString() },
+                  { label: 'Date', value: new Date(selectedInvoice.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) },
                   { label: 'Customer', value: selectedInvoice.customer_name },
                   { label: 'Phone', value: selectedInvoice.customer_phone || '—' },
                   { label: 'Email', value: selectedInvoice.customer_email || '—' },
