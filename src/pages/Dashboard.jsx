@@ -8,7 +8,7 @@ import {
 } from '@ant-design/icons';
 import ButterflyLogo from '../components/ButterflyLogo';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const actionConfig = {
   LOGIN:          { color: '#6c63ff', bg: 'rgba(108,99,255,0.1)', icon: <LoginOutlined />,       label: 'Login'           },

@@ -3,7 +3,7 @@ import axios from 'axios';
 import { message, Spin, Table, Button, Modal, Empty, Input, Select, Popconfirm } from 'antd';
 import { FilePdfOutlined, EyeOutlined, SearchOutlined, DownloadOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const PAY_COLORS = {
   Cash:   { color: '#52c97a', bg: 'rgba(82,201,122,0.12)' },
@@ -226,7 +226,7 @@ function Records() {
       </div>
 
       {/* Table */}
-      <div className="records-table-card style={{overflow:"auto"}}>
+      <div className="records-table-card" style={{overflow:"auto"}}>
         <div className="records-table-header">
           <div>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text)', fontFamily: 'Raleway, sans-serif' }}>All Invoices</h3>

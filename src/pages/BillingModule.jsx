@@ -3,7 +3,7 @@ import axios from 'axios';
 import { message, Spin, Modal, Input, InputNumber, Tooltip, Popconfirm } from 'antd';
 import { DeleteOutlined, PlusOutlined, ShoppingCartOutlined, UserOutlined, PhoneOutlined, MailOutlined, EditOutlined, WhatsAppOutlined } from '@ant-design/icons';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 const CAT = { Electronics:{bg:'rgba(77,150,255,.12)',color:'#4d96ff'}, Accessories:{bg:'rgba(108,99,255,.12)',color:'#6c63ff'}, Audio:{bg:'rgba(82,201,122,.12)',color:'#52c97a'}, General:{bg:'rgba(245,158,11,.12)',color:'#f59e0b'} };
 
 // ── Field wrapper (defined outside component to prevent focus loss) ──────────

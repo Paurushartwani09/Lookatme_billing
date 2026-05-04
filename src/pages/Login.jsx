@@ -4,7 +4,7 @@ import { message } from 'antd';
 import { UserOutlined, LockOutlined, EyeOutlined, EyeInvisibleOutlined } from '@ant-design/icons';
 import ButterflyLogo from '../components/ButterflyLogo';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState('');
