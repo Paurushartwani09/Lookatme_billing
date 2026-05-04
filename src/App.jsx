@@ -3,12 +3,13 @@ import { Avatar, Dropdown, Badge, message } from 'antd';
 import {
   DashboardOutlined, FileAddOutlined, FileTextOutlined,
   LogoutOutlined, UserOutlined, BellOutlined,
-  MenuFoldOutlined, MenuUnfoldOutlined,
+  MenuFoldOutlined, MenuUnfoldOutlined, SettingOutlined,
 } from '@ant-design/icons';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import BillingModule from './pages/BillingModule';
 import Records from './pages/Records';
+import Settings from './pages/Settings';
 import ButterflyLogo from './components/ButterflyLogo';
 import './App.css';
 
@@ -16,12 +17,14 @@ const NAV = [
   { key: 'dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
   { key: 'billing',   icon: <FileAddOutlined />,   label: 'Create Bill' },
   { key: 'records',   icon: <FileTextOutlined />,  label: 'Records' },
+  { key: 'settings',  icon: <SettingOutlined />,   label: 'Settings' },
 ];
 
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
   billing:   'Create New Bill',
   records:   'Billing Records',
+  settings:  'Account Settings',
 };
 
 export default function App() {
@@ -59,6 +62,12 @@ export default function App() {
     localStorage.removeItem('user');
     setAuth(false); setUser(null); setPage('dashboard');
     message.info('Logged out successfully');
+  };
+
+  const handleUserUpdate = (updatedUser, newToken) => {
+    setUser(updatedUser);
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+    if (newToken) localStorage.setItem('token', newToken);
   };
 
   if (loading) return (
@@ -165,7 +174,11 @@ export default function App() {
             </button>
 
             <Dropdown
-              menu={{ items: [{ key: 'logout', icon: <LogoutOutlined />, label: 'Logout', danger: true, onClick: handleLogout }] }}
+              menu={{ items: [
+                { key: 'settings', icon: <SettingOutlined />, label: 'Account Settings', onClick: () => setPage('settings') },
+                { type: 'divider' },
+                { key: 'logout', icon: <LogoutOutlined />, label: 'Logout', danger: true, onClick: handleLogout },
+              ]}}
               placement="bottomRight"
               arrow
             >
@@ -189,6 +202,7 @@ export default function App() {
           {page === 'dashboard' && <Dashboard />}
           {page === 'billing'   && <BillingModule />}
           {page === 'records'   && <Records />}
+          {page === 'settings'  && <Settings user={user} onUserUpdate={handleUserUpdate} />}
         </main>
 
         {/* ── MOBILE BOTTOM NAV ─────────────────────────────── */}

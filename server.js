@@ -176,6 +176,57 @@ app.post('/api/auth/login', (req, res) => {
   });
 });
 
+// Change username
+app.put('/api/auth/change-username', authenticateToken, (req, res) => {
+  const { new_username, current_password } = req.body;
+  if (!new_username || !current_password)
+    return res.status(400).json({ error: 'New username and current password are required' });
+
+  db.get(`SELECT * FROM admins WHERE id = ?`, [req.user.id], (err, admin) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    if (!admin) return res.status(404).json({ error: 'User not found' });
+
+    if (!bcrypt.compareSync(current_password, admin.password))
+      return res.status(401).json({ error: 'Incorrect current password' });
+
+    db.get(`SELECT id FROM admins WHERE username = ? AND id != ?`, [new_username, req.user.id], (err, existing) => {
+      if (err) return res.status(500).json({ error: 'Database error' });
+      if (existing) return res.status(409).json({ error: 'Username already taken' });
+
+      db.run(`UPDATE admins SET username = ? WHERE id = ?`, [new_username, req.user.id], function(err) {
+        if (err) return res.status(500).json({ error: 'Failed to update username' });
+        const newToken = jwt.sign({ id: admin.id, username: new_username }, JWT_SECRET, { expiresIn: '24h' });
+        logActivity(req.user.id, 'CHANGE_USERNAME', `Username changed to: ${new_username}`);
+        res.json({ token: newToken, admin: { id: admin.id, username: new_username, email: admin.email } });
+      });
+    });
+  });
+});
+
+// Change password
+app.put('/api/auth/change-password', authenticateToken, (req, res) => {
+  const { current_password, new_password } = req.body;
+  if (!current_password || !new_password)
+    return res.status(400).json({ error: 'Current and new password are required' });
+  if (new_password.length < 6)
+    return res.status(400).json({ error: 'New password must be at least 6 characters' });
+
+  db.get(`SELECT * FROM admins WHERE id = ?`, [req.user.id], (err, admin) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    if (!admin) return res.status(404).json({ error: 'User not found' });
+
+    if (!bcrypt.compareSync(current_password, admin.password))
+      return res.status(401).json({ error: 'Incorrect current password' });
+
+    const hashed = bcrypt.hashSync(new_password, 10);
+    db.run(`UPDATE admins SET password = ? WHERE id = ?`, [hashed, req.user.id], function(err) {
+      if (err) return res.status(500).json({ error: 'Failed to update password' });
+      logActivity(req.user.id, 'CHANGE_PASSWORD', 'Password changed successfully');
+      res.json({ success: true });
+    });
+  });
+});
+
 // ==================== PRODUCT ROUTES ====================
 
 // Get all products
