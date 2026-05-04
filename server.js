@@ -553,11 +553,11 @@ app.get('/api/invoices/:id/pdf', authenticateToken, (req, res) => {
 
       // Total box
       rowY += 4;
-      doc.roundedRect(totalsX - 12, rowY, 232, 38, 8).fill('#6c63ff');
-      doc.fillColor('rgba(255,255,255,0.8)').font('Helvetica').fontSize(10)
-         .text('TOTAL AMOUNT', totalsX, rowY + 8, { lineBreak: false });
-      doc.fillColor('white').font('Helvetica-Bold').fontSize(14)
-         .text(`Rs. ${invoice.total_amount.toLocaleString('en-IN')}`, totalsX + 100, rowY + 6, { lineBreak: false });
+      doc.roundedRect(totalsX - 12, rowY, 232, 48, 8).fill('#6c63ff');
+      doc.fillColor('rgba(255,255,255,0.75)').font('Helvetica').fontSize(9)
+         .text('TOTAL AMOUNT', totalsX - 12, rowY + 8, { width: 232, align: 'center', lineBreak: false });
+      doc.fillColor('white').font('Helvetica-Bold').fontSize(15)
+         .text(`Rs. ${invoice.total_amount.toLocaleString('en-IN')}`, totalsX - 12, rowY + 24, { width: 232, align: 'center', lineBreak: false });
 
       rowY += 60;
 
@@ -732,9 +732,9 @@ app.get('/api/invoices/:id/pdf-base64', authenticateToken, (req, res) => {
         rowY+=16;
       });
       rowY+=4;
-      doc.roundedRect(totalsX-12,rowY,232,38,8).fill('#6c63ff');
-      doc.fillColor('rgba(255,255,255,0.8)').font('Helvetica').fontSize(10).text('TOTAL AMOUNT',totalsX,rowY+8,{lineBreak:false});
-      doc.fillColor('white').font('Helvetica-Bold').fontSize(14).text(`Rs. ${invoice.total_amount.toLocaleString('en-IN')}`,totalsX+100,rowY+6,{lineBreak:false});
+      doc.roundedRect(totalsX-12,rowY,232,48,8).fill('#6c63ff');
+      doc.fillColor('rgba(255,255,255,0.75)').font('Helvetica').fontSize(9).text('TOTAL AMOUNT',totalsX-12,rowY+8,{width:232,align:'center',lineBreak:false});
+      doc.fillColor('white').font('Helvetica-Bold').fontSize(15).text(`Rs. ${invoice.total_amount.toLocaleString('en-IN')}`,totalsX-12,rowY+24,{width:232,align:'center',lineBreak:false});
       rowY+=60;
       doc.roundedRect(margin,rowY-10,140,26,6).fill('rgba(107,207,127,0.15)');
       doc.fillColor('#6bcf7f').font('Helvetica-Bold').fontSize(9).text(`Paid via ${invoice.payment_method}`,margin+10,rowY-3,{lineBreak:false});
