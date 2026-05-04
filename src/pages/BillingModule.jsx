@@ -52,6 +52,7 @@ function BillingModule() {
   const [taxAmount,setTaxAmount]=useState(0);
   const [discountAmount,setDiscountAmount]=useState(0);
   const [paymentMethod,setPaymentMethod]=useState('Cash');
+  const [billStatus,setBillStatus]=useState('paid');
   const [loading,setLoading]=useState(true);
   const [submitting,setSubmitting]=useState(false);
   const [errors,setErrors]=useState({});
@@ -100,7 +101,8 @@ function BillingModule() {
         items:cartItems,
         tax_amount:taxAmount,
         discount_amount:discountAmount,
-        payment_method:paymentMethod
+        payment_method:paymentMethod,
+        status:billStatus
       },{headers:{Authorization:'Bearer '+token}});
       message.success('Bill created! Downloading PDF...');
       setTimeout(()=>downloadPDF(res.data.id,res.data.invoice_number),500);
@@ -111,6 +113,7 @@ function BillingModule() {
       setTaxAmount(0);
       setDiscountAmount(0);
       setPaymentMethod('Cash');
+      setBillStatus('paid');
       setErrors({});
     }catch(err){
       message.error(err.response?.data?.error||'Failed to create bill');
@@ -191,6 +194,11 @@ function BillingModule() {
             <div className='cart-total'><span className='cart-total-label'>Total Amount</span><span className='cart-total-value'>Rs.{total.toLocaleString('en-IN')}</span></div>
             <p style={{fontSize:12,fontWeight:700,color:'var(--muted)',marginBottom:10,textTransform:'uppercase',letterSpacing:'.5px'}}>Payment Method</p>
             <div className='payment-grid'>{payMethods.map(pm=>(<button key={pm.key} className='pay-btn' onClick={()=>setPaymentMethod(pm.key)} style={{border:paymentMethod===pm.key?'2px solid '+pm.color:'2px solid var(--border)',background:paymentMethod===pm.key?pm.color+'15':'#fff',color:paymentMethod===pm.key?pm.color:'var(--muted)'}}>{pm.icon} {pm.key}</button>))}</div>
+            <p style={{fontSize:12,fontWeight:700,color:'var(--muted)',margin:'16px 0 10px',textTransform:'uppercase',letterSpacing:'.5px'}}>Payment Status</p>
+            <div style={{display:'flex',gap:10,marginBottom:16}}>
+              <button onClick={()=>setBillStatus('paid')} style={{flex:1,padding:'10px 0',borderRadius:10,border:billStatus==='paid'?'2px solid #52c97a':'2px solid var(--border)',background:billStatus==='paid'?'rgba(82,201,122,.12)':'#fff',color:billStatus==='paid'?'#52c97a':'var(--muted)',fontWeight:700,fontSize:13,cursor:'pointer',transition:'all .2s'}}>✅ Paid</button>
+              <button onClick={()=>setBillStatus('unpaid')} style={{flex:1,padding:'10px 0',borderRadius:10,border:billStatus==='unpaid'?'2px solid #ef4444':'2px solid var(--border)',background:billStatus==='unpaid'?'rgba(239,68,68,.10)':'#fff',color:billStatus==='unpaid'?'#ef4444':'var(--muted)',fontWeight:700,fontSize:13,cursor:'pointer',transition:'all .2s'}}>❌ Not Paid</button>
+            </div>
             <button className='create-btn' onClick={handleCreateBill} disabled={submitting}>{submitting?'Creating...':'Create & Download Bill'}</button>
             <button className='clear-btn' onClick={()=>setCartItems([])}>Clear Cart</button>
           </>)}

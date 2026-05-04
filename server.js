@@ -256,7 +256,7 @@ const generateInvoiceNumber = (callback) => {
 
 // Create invoice
 app.post('/api/invoices', authenticateToken, (req, res) => {
-  const { customer_name, customer_phone, customer_email, items, tax_amount, discount_amount, payment_method } = req.body;
+  const { customer_name, customer_phone, customer_email, items, tax_amount, discount_amount, payment_method, status } = req.body;
 
   if (!customer_name || !items || items.length === 0) {
     return res.status(400).json({ error: 'Customer name and items required' });
@@ -267,9 +267,9 @@ app.post('/api/invoices', authenticateToken, (req, res) => {
     const totalAmount = items.reduce((sum, item) => sum + item.total_price, 0) + (tax_amount || 0) - (discount_amount || 0);
 
     db.run(
-      `INSERT INTO invoices (id, invoice_number, customer_name, customer_phone, customer_email, total_amount, tax_amount, discount_amount, payment_method, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [invoiceId, invoiceNumber, customer_name, customer_phone, customer_email, totalAmount, tax_amount || 0, discount_amount || 0, payment_method || 'Cash', req.user.id],
+      `INSERT INTO invoices (id, invoice_number, customer_name, customer_phone, customer_email, total_amount, tax_amount, discount_amount, payment_method, status, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [invoiceId, invoiceNumber, customer_name, customer_phone, customer_email, totalAmount, tax_amount || 0, discount_amount || 0, payment_method || 'Cash', status || 'paid', req.user.id],
       (err) => {
         if (err) return res.status(500).json({ error: 'Failed to create invoice' });
 
@@ -486,7 +486,7 @@ app.get('/api/invoices/:id/pdf', authenticateToken, (req, res) => {
         ['Invoice No.', invoice.invoice_number],
         ['Date',        new Date(invoice.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })],
         ['Payment',     invoice.payment_method],
-        ['Status',      'PAID'],
+        ['Status',      invoice.status === 'unpaid' ? 'UNPAID' : 'PAID'],
       ];
       details.forEach(([label, value], i) => {
         const dy = infoY + 32 + i * 17;
@@ -701,7 +701,7 @@ app.get('/api/invoices/:id/pdf-base64', authenticateToken, (req, res) => {
       doc.roundedRect(detailX,infoY,240,110,10).fill('#f8f9fc');
       doc.fillColor('#6c63ff').font('Helvetica-Bold').fontSize(8).text('INVOICE DETAILS',detailX+16,infoY+14,{lineBreak:false});
       doc.moveTo(detailX+16,infoY+24).lineTo(detailX+100,infoY+24).strokeColor('#6c63ff').lineWidth(1.5).stroke();
-      [['Invoice No.',invoice.invoice_number],['Date',new Date(invoice.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})],['Payment',invoice.payment_method],['Status','PAID']].forEach(([label,value],i)=>{
+      [['Invoice No.',invoice.invoice_number],['Date',new Date(invoice.created_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})],['Payment',invoice.payment_method],['Status',invoice.status==='unpaid'?'UNPAID':'PAID']].forEach(([label,value],i)=>{
         const dy=infoY+32+i*17;
         doc.fillColor('#9ca3af').font('Helvetica').fontSize(8).text(label,detailX+16,dy,{lineBreak:false});
         doc.fillColor('#1a1a2e').font('Helvetica-Bold').fontSize(9).text(value,detailX+100,dy,{lineBreak:false});
