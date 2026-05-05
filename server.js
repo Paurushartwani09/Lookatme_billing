@@ -227,6 +227,56 @@ app.put('/api/auth/change-password', authenticateToken, (req, res) => {
   });
 });
 
+// Get all users (admin only)
+app.get('/api/auth/users', authenticateToken, (req, res) => {
+  db.all(`SELECT id, username, email, created_at FROM admins ORDER BY created_at ASC`, (err, rows) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    res.json(rows);
+  });
+});
+
+// Create new user
+app.post('/api/auth/create-user', authenticateToken, (req, res) => {
+  const { username, password, email } = req.body;
+  if (!username || !password)
+    return res.status(400).json({ error: 'Username and password are required' });
+  if (password.length < 6)
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  if (!/^[a-zA-Z0-9_]+$/.test(username.trim()))
+    return res.status(400).json({ error: 'Username can only contain letters, numbers and underscore' });
+
+  db.get(`SELECT id FROM admins WHERE username = ?`, [username.trim()], (err, existing) => {
+    if (err) return res.status(500).json({ error: 'Database error' });
+    if (existing) return res.status(409).json({ error: 'Username already taken' });
+
+    const newId = uuidv4();
+    const hashed = bcrypt.hashSync(password, 10);
+    db.run(
+      `INSERT INTO admins (id, username, password, email) VALUES (?, ?, ?, ?)`,
+      [newId, username.trim(), hashed, email || null],
+      function(err) {
+        if (err) return res.status(500).json({ error: 'Failed to create user' });
+        logActivity(req.user.id, 'CREATE_USER', `Created new user: ${username.trim()}`);
+        res.status(201).json({ id: newId, username: username.trim(), email: email || null });
+      }
+    );
+  });
+});
+
+// Delete user (cannot delete yourself)
+app.delete('/api/auth/users/:id', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  if (id === req.user.id)
+    return res.status(400).json({ error: 'You cannot delete your own account' });
+
+  db.run(`DELETE FROM admins WHERE id = ?`, [id], function(err) {
+    if (err) return res.status(500).json({ error: 'Failed to delete user' });
+    if (this.changes === 0) return res.status(404).json({ error: 'User not found' });
+    logActivity(req.user.id, 'DELETE_USER', `Deleted user id: ${id}`);
+    res.json({ success: true });
+  });
+});
+
 // ==================== PRODUCT ROUTES ====================
 
 // Get all products

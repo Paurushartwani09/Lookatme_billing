@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { message, Spin } from 'antd';
-import { UserOutlined, LockOutlined, EyeOutlined, EyeInvisibleOutlined, SettingOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { message, Spin, Popconfirm } from 'antd';
+import { UserOutlined, LockOutlined, EyeOutlined, EyeInvisibleOutlined, SettingOutlined, CheckCircleOutlined, UserAddOutlined, DeleteOutlined, TeamOutlined } from '@ant-design/icons';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -151,6 +151,76 @@ function Settings({ user, onUserUpdate }) {
     }
   };
 
+  // ── New user state ───────────────────────────────────────
+  const [newUserName,  setNewUserName]  = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPwd,   setNewUserPwd]   = useState('');
+  const [newUserErr,   setNewUserErr]   = useState({});
+  const [savingNew,    setSavingNew]    = useState(false);
+  const [newUserDone,  setNewUserDone]  = useState(false);
+
+  // ── Users list state ─────────────────────────────────────
+  const [users,        setUsers]        = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+
+  useEffect(() => { fetchUsers(); }, []);
+
+  const fetchUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await axios.get(`${API_URL}/auth/users`, { headers: { Authorization: `Bearer ${token}` } });
+      setUsers(res.data);
+    } catch { message.error('Failed to load users'); }
+    finally { setLoadingUsers(false); }
+  };
+
+  const validateNewUser = () => {
+    const e = {};
+    if (!newUserName.trim()) e.newUserName = 'Username is required';
+    else if (newUserName.trim().length < 3) e.newUserName = 'At least 3 characters';
+    else if (!/^[a-zA-Z0-9_]+$/.test(newUserName.trim())) e.newUserName = 'Only letters, numbers and underscore';
+    if (!newUserPwd.trim()) e.newUserPwd = 'Password is required';
+    else if (newUserPwd.length < 6) e.newUserPwd = 'At least 6 characters';
+    setNewUserErr(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleCreateUser = async () => {
+    if (!validateNewUser()) return;
+    setSavingNew(true);
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_URL}/auth/create-user`, {
+        username: newUserName.trim(),
+        password: newUserPwd,
+        email: newUserEmail.trim() || null,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      message.success(`User "${newUserName.trim()}" created!`);
+      setNewUserName(''); setNewUserEmail(''); setNewUserPwd('');
+      setNewUserErr({});
+      setNewUserDone(true);
+      setTimeout(() => setNewUserDone(false), 3000);
+      fetchUsers();
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Failed to create user';
+      if (msg.toLowerCase().includes('taken') || msg.toLowerCase().includes('exists')) {
+        setNewUserErr({ newUserName: 'Username already taken' });
+      } else { message.error(msg); }
+    } finally { setSavingNew(false); }
+  };
+
+  const handleDeleteUser = async (id, username) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_URL}/auth/users/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      message.success(`User "${username}" deleted`);
+      fetchUsers();
+    } catch (err) {
+      message.error(err.response?.data?.error || 'Failed to delete user');
+    }
+  };
+
   // ── Password strength ────────────────────────────────────
   const getStrength = (pwd) => {
     if (!pwd) return 0;
@@ -293,6 +363,128 @@ function Settings({ user, onUserUpdate }) {
             >
               {savingPwd ? <Spin size='small' /> : pwdDone ? <><CheckCircleOutlined /> Password Updated!</> : 'Update Password'}
             </button>
+          </div>
+        </div>
+
+      </div>
+
+      {/* ── Create New User + Users List (full width below) ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 24, marginTop: 24 }}>
+
+        {/* ── Create New User Card ─────────────────────────── */}
+        <div className='card'>
+          <div className='card-header'>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div className='icon-badge' style={{ background: 'linear-gradient(135deg,#52c97a,#56ab2f)', width: 38, height: 38, borderRadius: 11, fontSize: 17 }}>
+                <UserAddOutlined />
+              </div>
+              <div>
+                <div className='card-title'>Create New User</div>
+                <div className='card-sub'>Add another login account</div>
+              </div>
+            </div>
+          </div>
+          <div className='card-body'>
+            <F label='Username *' err={newUserErr.newUserName}>
+              <div className='field-wrap'>
+                <span className='field-icon'><UserOutlined /></span>
+                <input
+                  type='text'
+                  value={newUserName}
+                  onChange={e => { setNewUserName(e.target.value); if (newUserErr.newUserName) setNewUserErr(prev => ({ ...prev, newUserName: '' })); }}
+                  placeholder='Enter username'
+                  className='field-input'
+                  style={{ borderColor: newUserErr.newUserName ? '#ef4444' : undefined }}
+                  autoComplete='off'
+                />
+              </div>
+            </F>
+            <F label='Email (optional)' err={newUserErr.newUserEmail}>
+              <div className='field-wrap'>
+                <span className='field-icon'>@</span>
+                <input
+                  type='email'
+                  value={newUserEmail}
+                  onChange={e => setNewUserEmail(e.target.value)}
+                  placeholder='user@email.com'
+                  className='field-input'
+                  autoComplete='off'
+                />
+              </div>
+            </F>
+            <F label='Password *' err={newUserErr.newUserPwd}>
+              <PasswordInput
+                value={newUserPwd}
+                onChange={e => { setNewUserPwd(e.target.value); if (newUserErr.newUserPwd) setNewUserErr(prev => ({ ...prev, newUserPwd: '' })); }}
+                placeholder='Set a password (min 6 chars)'
+              />
+            </F>
+            <button
+              onClick={handleCreateUser}
+              disabled={savingNew}
+              style={{
+                width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
+                background: newUserDone ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'linear-gradient(135deg,#52c97a,#56ab2f)',
+                color: '#fff', fontWeight: 700, fontSize: 14, cursor: savingNew ? 'not-allowed' : 'pointer',
+                fontFamily: 'Raleway, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                opacity: savingNew ? 0.7 : 1, transition: 'all .3s', boxShadow: '0 4px 14px rgba(82,201,122,.35)',
+              }}
+            >
+              {savingNew ? <Spin size='small' /> : newUserDone ? <><CheckCircleOutlined /> User Created!</> : <><UserAddOutlined /> Create User</>}
+            </button>
+          </div>
+        </div>
+
+        {/* ── All Users List Card ──────────────────────────── */}
+        <div className='card'>
+          <div className='card-header'>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div className='icon-badge' style={{ background: 'linear-gradient(135deg,#667eea,#764ba2)', width: 38, height: 38, borderRadius: 11, fontSize: 17 }}>
+                <TeamOutlined />
+              </div>
+              <div>
+                <div className='card-title'>All Users</div>
+                <div className='card-sub'>{users.length} account{users.length !== 1 ? 's' : ''} in system</div>
+              </div>
+            </div>
+          </div>
+          <div className='card-body'>
+            {loadingUsers ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}><Spin /></div>
+            ) : users.length === 0 ? (
+              <p style={{ color: 'var(--muted)', textAlign: 'center', padding: 24 }}>No users found</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {users.map(u => (
+                  <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, background: u.id === user?.id ? 'rgba(108,99,255,.07)' : 'var(--bg)', border: `1.5px solid ${u.id === user?.id ? 'rgba(108,99,255,.25)' : 'var(--border)'}` }}>
+                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: u.id === user?.id ? 'linear-gradient(135deg,#667eea,#764ba2)' : 'linear-gradient(135deg,#4d96ff,#1e90ff)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 15, flexShrink: 0 }}>
+                      {u.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: 14, fontFamily: 'Raleway, sans-serif', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {u.username}
+                        {u.id === user?.id && <span style={{ fontSize: 10, background: 'rgba(108,99,255,.15)', color: '#6c63ff', padding: '2px 7px', borderRadius: 10, fontWeight: 700 }}>YOU</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{u.email || 'No email'}</div>
+                    </div>
+                    {u.id !== user?.id && (
+                      <Popconfirm
+                        title={`Delete user "${u.username}"?`}
+                        description='This user will no longer be able to log in.'
+                        onConfirm={() => handleDeleteUser(u.id, u.username)}
+                        okText='Delete' cancelText='Cancel' okButtonProps={{ danger: true }}
+                      >
+                        <button style={{ width: 30, height: 30, borderRadius: 8, border: '1.5px solid var(--border)', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontSize: 13, flexShrink: 0 }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,.08)'; e.currentTarget.style.borderColor = '#ef4444'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = 'var(--border)'; }}>
+                          <DeleteOutlined />
+                        </button>
+                      </Popconfirm>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
