@@ -6,7 +6,7 @@ import ButterflyLogo from '../components/ButterflyLogo';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-function Login({ onLogin }) {
+function Login({ onLogin, sessionMsg }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,6 +79,13 @@ function Login({ onLogin }) {
         {/* Right Panel - Login Form */}
         <div className="login-form-panel">
           <div className="login-card">
+            {/* Session expired banner */}
+            {sessionMsg && (
+              <div style={{ background: 'rgba(245,158,11,.08)', border: '1.5px solid rgba(245,158,11,.35)', borderRadius: 12, padding: '12px 16px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 20 }}>⏱️</span>
+                <span style={{ fontSize: 13, color: '#b45309', fontWeight: 600, fontFamily: 'Raleway, sans-serif' }}>{sessionMsg}</span>
+              </div>
+            )}
             <div style={{ marginBottom: 32 }}>
               <h2 className="login-card-title">Welcome back 👋</h2>
               <p className="login-card-sub">Sign in to your billing dashboard</p>

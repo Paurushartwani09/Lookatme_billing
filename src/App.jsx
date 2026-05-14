@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Avatar, Dropdown, Badge, message } from 'antd';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Avatar, Dropdown, Badge, message, Modal } from 'antd';
 import {
   DashboardOutlined, FileAddOutlined, FileTextOutlined,
   LogoutOutlined, UserOutlined, BellOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined, SettingOutlined,
+  ClockCircleOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -12,6 +13,10 @@ import Records from './pages/Records';
 import Settings from './pages/Settings';
 import ButterflyLogo from './components/ButterflyLogo';
 import './App.css';
+
+const SESSION_TIMEOUT   = 30 * 60 * 1000; // 30 minutes
+const WARNING_BEFORE    =  5 * 60 * 1000; // warn at 25 min (5 min before logout)
+const WARNING_AT        = SESSION_TIMEOUT - WARNING_BEFORE;
 
 const NAV = [
   { key: 'dashboard', icon: <DashboardOutlined />, label: 'Dashboard' },
@@ -28,12 +33,19 @@ const PAGE_TITLES = {
 };
 
 export default function App() {
-  const [auth,      setAuth]      = useState(false);
-  const [page,      setPage]      = useState('dashboard');
-  const [user,      setUser]      = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [auth,        setAuth]        = useState(false);
+  const [page,        setPage]        = useState('dashboard');
+  const [user,        setUser]        = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [collapsed,   setCollapsed]   = useState(false);
+  const [mobileOpen,  setMobileOpen]  = useState(false);
+  const [showWarning, setShowWarning] = useState(false);
+  const [countdown,   setCountdown]   = useState(300); // seconds left in warning
+  const [sessionMsg,  setSessionMsg]  = useState('');  // message shown on login after timeout
+
+  const warningTimer  = useRef(null);
+  const logoutTimer   = useRef(null);
+  const countdownRef  = useRef(null);
 
   // Detect mobile
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -50,17 +62,89 @@ export default function App() {
     setLoading(false);
   }, []);
 
+  // ── Session timeout logic ────────────────────────────────
+  const clearAllTimers = useCallback(() => {
+    clearTimeout(warningTimer.current);
+    clearTimeout(logoutTimer.current);
+    clearInterval(countdownRef.current);
+  }, []);
+
+  const doLogout = useCallback((reason = '') => {
+    clearAllTimers();
+    setShowWarning(false);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setAuth(false);
+    setUser(null);
+    setPage('dashboard');
+    setSessionMsg(reason);
+  }, [clearAllTimers]);
+
+  const startTimers = useCallback(() => {
+    clearAllTimers();
+    setShowWarning(false);
+
+    // Show warning at 25 min
+    warningTimer.current = setTimeout(() => {
+      setShowWarning(true);
+      setCountdown(300); // 5 min = 300 sec
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(countdownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }, WARNING_AT);
+
+    // Auto logout at 30 min
+    logoutTimer.current = setTimeout(() => {
+      doLogout('Your session expired after 30 minutes of inactivity.');
+    }, SESSION_TIMEOUT);
+  }, [clearAllTimers, doLogout]);
+
+  const resetTimers = useCallback(() => {
+    if (!auth) return;
+    startTimers();
+  }, [auth, startTimers]);
+
+  // Start timers when logged in
+  useEffect(() => {
+    if (auth) {
+      startTimers();
+    } else {
+      clearAllTimers();
+    }
+    return () => clearAllTimers();
+  }, [auth, startTimers, clearAllTimers]);
+
+  // Reset on any user activity
+  useEffect(() => {
+    if (!auth) return;
+    const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
+    events.forEach(e => window.addEventListener(e, resetTimers, { passive: true }));
+    return () => events.forEach(e => window.removeEventListener(e, resetTimers));
+  }, [auth, resetTimers]);
+
+  const handleStayLoggedIn = () => {
+    setShowWarning(false);
+    clearInterval(countdownRef.current);
+    startTimers();
+  };
+
+  // ── Auth handlers ────────────────────────────────────────
   const handleLogin = (token, userData) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(userData));
     setAuth(true); setUser(userData); setPage('dashboard');
+    setSessionMsg('');
     message.success('Welcome back! 👋');
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setAuth(false); setUser(null); setPage('dashboard');
+    doLogout('');
     message.info('Logged out successfully');
   };
 
@@ -76,7 +160,7 @@ export default function App() {
     </div>
   );
 
-  if (!auth) return <Login onLogin={handleLogin} />;
+  if (!auth) return <Login onLogin={handleLogin} sessionMsg={sessionMsg} />;
 
   const sideW = isMobile ? 0 : (collapsed ? 72 : 240);
 
@@ -86,6 +170,7 @@ export default function App() {
   };
 
   return (
+    <>
     <div className="app-shell">
 
       {/* ── MOBILE OVERLAY ──────────────────────────────────── */}
@@ -222,5 +307,45 @@ export default function App() {
         )}
       </div>
     </div>
+
+      {/* ── Session Timeout Warning Modal ───────────────────── */}
+      <Modal
+        open={showWarning}
+        closable={false}
+        maskClosable={false}
+        footer={null}
+        centered
+        width={400}
+      >
+        <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'rgba(245,158,11,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 30 }}>
+            <ClockCircleOutlined style={{ color: '#f59e0b' }} />
+          </div>
+          <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800, color: 'var(--text)', fontFamily: 'Raleway, sans-serif' }}>
+            Session Expiring Soon
+          </h3>
+          <p style={{ margin: '0 0 6px', fontSize: 14, color: 'var(--muted)', fontFamily: 'Raleway, sans-serif' }}>
+            You've been inactive. You'll be logged out in:
+          </p>
+          <div style={{ fontSize: 42, fontWeight: 900, color: countdown <= 60 ? '#ef4444' : '#f59e0b', fontFamily: 'monospace', margin: '12px 0 20px', letterSpacing: 2 }}>
+            {String(Math.floor(countdown / 60)).padStart(2, '0')}:{String(countdown % 60).padStart(2, '0')}
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button
+              onClick={() => doLogout('')}
+              style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '2px solid var(--border)', background: '#fff', color: 'var(--muted)', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'Raleway, sans-serif' }}
+            >
+              Logout Now
+            </button>
+            <button
+              onClick={handleStayLoggedIn}
+              style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#667eea,#764ba2)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'Raleway, sans-serif', boxShadow: '0 4px 14px rgba(108,99,255,.35)' }}
+            >
+              Stay Logged In
+            </button>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }
